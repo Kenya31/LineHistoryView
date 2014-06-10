@@ -2,7 +2,7 @@
 * LineHistoryView.exe
 *
 * Create Date 2014/03/30
-* Update Date 2014/06/01
+*
 *
 * Update 2014/06/01
 *		エラーハンドリングを追加
@@ -11,6 +11,10 @@
 *
 * Update 2014/06/08
 *		サムネイルを内容フィールドに表示するように変更
+*
+* Update 2014/06/10
+*		SELECT文にDATETIME関数を追加。
+*		それに伴いいろいろ変更
 *
 */
 #include <stdio.h>
@@ -51,14 +55,14 @@ using namespace std;
 #define RESULT_DIR "result\\"
 #define THUMBNAIL_DIR "result\\thumbnail\\"
 #define LINE_HTML "result\\Line.html"
+
 /**
-* 
+* クエリ結果をHTMLタグで整形して出力
 *
 */
 void PrintResult(vector<LineHistory> array, ofstream *line_html) {
-	__time64_t ltime;
 	string cType;
-	char zTimeStamp[1024];
+	string zTimeStamp;
 	string mType;
 	string zAddress;
 	string zChat;
@@ -69,7 +73,6 @@ void PrintResult(vector<LineHistory> array, ofstream *line_html) {
 	string zText;
 	void * zThumbnail;
 	int size;
-	struct tm gmt;
 	string tmp;
 	string fileName;
 
@@ -84,17 +87,9 @@ void PrintResult(vector<LineHistory> array, ofstream *line_html) {
 	while( it != array.end() ) {
 		lh = *it;
 
-		tmp = lh.GetZtimeStamp();
-		if ("" == tmp) {
-			// UNIXタイムが入っていなかった場合
-			memset(zTimeStamp, 0, sizeof(zTimeStamp));
-		}else{
-			// DBにはミリ秒で入っているので、1000で割って秒にする。
-			ltime = _strtoi64(lh.GetZtimeStamp().c_str(), '\0', 10) / 1000;
-			_localtime64_s(&gmt, &ltime);
-			// UNIXタイムから年月日時分秒形式に変換
-			strftime(zTimeStamp, sizeof(zTimeStamp), "%Y/%m/%d %H:%M:%S", &gmt);
-		}
+		// 時刻
+		zTimeStamp = lh.GetZtimeStamp();
+
 		// アドレス帳上の名前
 		zAddress = lh.GetZaddressBookName();
 
@@ -154,7 +149,6 @@ void PrintResult(vector<LineHistory> array, ofstream *line_html) {
 			// 最初のレコード
 			*line_html << "<table border=\"2\">" << endl;
 			*line_html << "<th width=\"150\" nowrap>日時(日本時間)</th>" << endl;
-			//		cout << "<th nowrap>ZCHATの値</th>");
 			*line_html << "<th width=\"150\" nowrap>アドレス帳上の名前</th>" << endl;
 			*line_html << "<th width=\"150\" nowrap>LINE上の名前</th>" << endl;
 			*line_html << "<th nowrap>送受信種別</th>" << endl;
@@ -166,8 +160,7 @@ void PrintResult(vector<LineHistory> array, ofstream *line_html) {
 			*line_html << "<hr size=\"5\"/>" << endl;
 			*line_html << "<table border=\"2\">" << endl;
 			// ヘッダー出力
-			*line_html << "<th width=\"150\" nowrap>日時</th>" << endl;
-			//		cout << "<th nowrap>ZCHATの値</th>" << endl;
+			*line_html << "<th width=\"150\" nowrap>日時(日本時間)</th>" << endl;
 			*line_html << "<th width=\"150\" nowrap>アドレス帳上の名前</th>" << endl;
 			*line_html << "<th width=\"150\" nowrap>LINE上の名前</th>" << endl;
 			*line_html << "<th nowrap>送受信種別</th>" << endl;
@@ -197,8 +190,9 @@ void PrintResult(vector<LineHistory> array, ofstream *line_html) {
 
 		// イテレータを進める
 		it++;
+
 		// 変数をクリア
-		memset(zTimeStamp, 0, sizeof(zTimeStamp));
+		zTimeStamp = EMPTY_STRING;
 		zAddress = EMPTY_STRING;
 		zName = EMPTY_STRING;
 		mType = EMPTY_STRING;
@@ -242,21 +236,30 @@ int main(int argc, char * argv[])
 {
 	int result = -1;
 	sqlite3 *db = (sqlite3 *)0;
-	const char *sql = "SELECT ZMESSAGE.Z_OPT, ZMESSAGE.ZCONTENTTYPE, ZMESSAGE.ZTIMESTAMP, ZMESSAGE.ZCHAT, ZMESSAGE.ZID, ZMESSAGE.ZTEXT, ZMESSAGE.ZTHUMBNAIL, ZUSER.ZADDRESSBOOKNAME, ZUSER.ZNAME FROM ZMESSAGE LEFT JOIN ZUSER ON ZMESSAGE.ZSENDER = ZUSER.Z_PK ORDER BY ZMESSAGE.ZCHAT, ZMESSAGE.ZTIMESTAMP;";
+	//	const char *sql = "SELECT ZMESSAGE.Z_OPT, ZMESSAGE.ZCONTENTTYPE, ZMESSAGE.ZTIMESTAMP, ZMESSAGE.ZCHAT, ZMESSAGE.ZID, ZMESSAGE.ZTEXT, ZMESSAGE.ZTHUMBNAIL, ZUSER.ZADDRESSBOOKNAME, ZUSER.ZNAME FROM ZMESSAGE LEFT JOIN ZUSER ON ZMESSAGE.ZSENDER = ZUSER.Z_PK ORDER BY ZMESSAGE.ZCHAT, ZMESSAGE.ZTIMESTAMP;";
+	const char *sql = "SELECT ZMESSAGE.Z_OPT, ZMESSAGE.ZCONTENTTYPE"
+		", DATETIME(ZMESSAGE.ZTIMESTAMP/1000, 'unixepoch', 'localtime')"
+		", ZMESSAGE.ZCHAT, ZMESSAGE.ZID, ZMESSAGE.ZTEXT"
+		", ZMESSAGE.ZTHUMBNAIL, ZUSER.ZADDRESSBOOKNAME"
+		", ZUSER.ZNAME"
+		" FROM ZMESSAGE LEFT JOIN ZUSER ON ZMESSAGE.ZSENDER = ZUSER.Z_PK"
+		" ORDER BY ZMESSAGE.ZCHAT, ZMESSAGE.ZTIMESTAMP;";
 
 	sqlite3_stmt *stmt = (sqlite3_stmt *)0;
 	char *errMsg = (char *)0;
-
 	// サムネイルを格納
 	int size = 0;
 	void *buf = (char *)0;
 
 	// クエリ結果を格納する配列
 	vector<LineHistory> array;
+
+	// クエリ結果1レコード分を格納するオブジェクト
 	LineHistory lh;
+
 	string tmp;
 	const unsigned char * zid = (unsigned char *)0;
-	const unsigned char * debug = (unsigned char *)0;
+	const unsigned char * value = (unsigned char *)0;
 	const void * zThumbnail = (void *)0;
 
 	// 出力ファイル
@@ -293,48 +296,48 @@ int main(int argc, char * argv[])
 			// オブジェクトに詰め詰めする。
 			// レコードの最初のフィールドの値を取得
 			// Z_OPT
-			debug = sqlite3_column_text(stmt, 0);
-			if (0 == debug) {
+			value = sqlite3_column_text(stmt, 0);
+			if ((unsigned char *)0 == value) {
 				lh.SetZopt(EMPTY_STRING);
 			} else {
-				tmp = (reinterpret_cast <char const *> (debug));
+				tmp = (reinterpret_cast <char const *> (value));
 				lh.SetZopt(tmp);
 			}
 
 			// レコードの2番目のフィールドの値を取得
 			// ZCONTENTTYPE
-			debug = sqlite3_column_text(stmt, 1);
-			if (0 == debug) {
+			value = sqlite3_column_text(stmt, 1);
+			if ((unsigned char *)0 == value) {
 				lh.SetZcontentType(EMPTY_STRING);
 			} else {
-				tmp = (reinterpret_cast <char const *> (debug));
+				tmp = (reinterpret_cast <char const *> (value));
 				lh.SetZcontentType(tmp);
 			}
 
 			// レコードの3番目のフィールドの値を取得
 			// ZTIMESTAMP
-			debug = sqlite3_column_text(stmt, 2);
-			if (0 == debug) {
+			value = sqlite3_column_text(stmt, 2);
+			if ((unsigned char *)0 == value) {
 				lh.SetZtimeStamp(EMPTY_STRING);
 			} else {
-				tmp = (reinterpret_cast <char const *> (debug));
+				tmp = (reinterpret_cast <char const *> (value));
 				lh.SetZtimeStamp(tmp);
 			}
 
 			// レコードの4番目のフィールドの値を取得
 			// ZCHAT
-			debug = sqlite3_column_text(stmt, 3);
-			if (0 == debug) {
+			value = sqlite3_column_text(stmt, 3);
+			if ((unsigned char *)0 == value) {
 				lh.SetZchat(EMPTY_STRING);
 			} else {
-				tmp = (reinterpret_cast <char const *> (debug));
+				tmp = (reinterpret_cast <char const *> (value));
 				lh.SetZchat(tmp);
 			}
 
 			// レコードの5番目のフィールドの値を取得
 			// ZIDはファイル名に使用する
 			zid = sqlite3_column_text(stmt, 4);
-			if (0 == zid) {
+			if ((unsigned char *)0 == zid) {
 				lh.SetZid(EMPTY_STRING);
 			} else {
 				tmp = (reinterpret_cast <char const *> (zid));
@@ -345,11 +348,11 @@ int main(int argc, char * argv[])
 
 			// レコードの6番目のフィールドの値を取得
 			// ZTEXT
-			debug = sqlite3_column_text(stmt, 5);
-			if (0 == debug) {
+			value = sqlite3_column_text(stmt, 5);
+			if ((unsigned char *)0 == value) {
 				lh.SetZtext(EMPTY_STRING);
 			} else {
-				tmp = (reinterpret_cast <char const *> (debug));
+				tmp = (reinterpret_cast <char const *> (value));
 				lh.SetZtext(tmp);
 			}
 
@@ -371,21 +374,21 @@ int main(int argc, char * argv[])
 
 			// レコードの8番目のフィールドの値を取得
 			// ZADDRESSBOOKNAME
-			debug = sqlite3_column_text(stmt, 7);
-			if (0 == debug) {
+			value = sqlite3_column_text(stmt, 7);
+			if ((unsigned char *)0 == value) {
 				lh.SetZaddressBookName(EMPTY_STRING);
 			} else {
-				tmp = (reinterpret_cast <char const *> (debug));
+				tmp = (reinterpret_cast <char const *> (value));
 				lh.SetZaddressBookName(tmp);
 			}
 
 			// レコードの9番目のフィールドの値を取得
 			// ZNAME
-			debug = sqlite3_column_text(stmt, 8);
-			if (0 == debug) {
+			value = sqlite3_column_text(stmt, 8);
+			if ((unsigned char *)0 == value) {
 				lh.SetZname(EMPTY_STRING);
 			} else {
-				tmp = (reinterpret_cast <char const *> (debug));
+				tmp = (reinterpret_cast <char const *> (value));
 				lh.SetZname(tmp);
 			}
 
@@ -394,7 +397,7 @@ int main(int argc, char * argv[])
 			lh.~LineHistory();
 		}
 
-		if ( SQLITE_DONE == result ) {
+		if (SQLITE_DONE == result) {
 			// 出力フォルダ作成
 			if (!PathIsDirectory(RESULT_DIR)) {
 				// resultフォルダが無い
