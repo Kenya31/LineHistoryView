@@ -17,20 +17,17 @@
 *		それに伴いいろいろ変更
 *
 */
+#include <direct.h>
+#include <sqlite3.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <locale.h>
-#include <time.h>
-#include <sqlite3.h>
-#include <windows.h>
-#include <iostream>
+#include <sys/stat.h>
 #include <fstream>
-#include <vector>
+#include <iostream>
 #include <string>
-#include <direct.h>
+#include <vector>
 
-#include "Shlwapi.h"
 #include "LineHistory.h"
 
 using namespace std;
@@ -52,12 +49,13 @@ using namespace std;
 #define META_TAG "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />"
 #define BREAK_TAG "<br/>"
 #define EMPTY_STRING ""
-#define RESULT_DIR "result\\"
-#define THUMBNAIL_DIR "result\\thumbnail\\"
-#define LINE_HTML "result\\Line.html"
+#define RESULT_DIR "result"
+#define THUMBNAIL_DIR "result/thumbnail"
+#define LINE_HTML "result/Line.html"
 
 /**
 * クエリ結果をHTMLタグで整形して出力
+* 一覧形式
 *
 */
 void PrintResult(vector<LineHistory> array, ofstream *line_html) {
@@ -110,6 +108,7 @@ void PrintResult(vector<LineHistory> array, ofstream *line_html) {
 		} else if ("7" == zContentType) {
 			// スタンプ
 			cType = "スタンプ";
+			lh.SetZtext(cType);
 		} else if ("100" == zContentType) {
 			// スタンプ
 			cType = "位置情報";
@@ -139,7 +138,7 @@ void PrintResult(vector<LineHistory> array, ofstream *line_html) {
 			// ファイル名をZIDから作成
 			fileName = lh.GetFileName();
 			ofstream fout;
-			fout.open(THUMBNAIL_DIR + fileName, ios::out|ios::binary|ios::trunc);
+			fout.open(THUMBNAIL_DIR + string("/") + fileName, ios::out|ios::binary|ios::trunc);
 			fout.write((char *)zThumbnail, size);
 			fout.close();
 			// サムネイルのために確保した領域を解放する
@@ -149,10 +148,10 @@ void PrintResult(vector<LineHistory> array, ofstream *line_html) {
 			// 最初のレコード
 			*line_html << "<table border=\"2\">" << endl;
 			*line_html << "<th width=\"150\" nowrap>日時(日本時間)</th>" << endl;
-			*line_html << "<th width=\"150\" nowrap>アドレス帳上の名前</th>" << endl;
-			*line_html << "<th width=\"150\" nowrap>LINE上の名前</th>" << endl;
+			//*line_html << "<th width=\"150\" nowrap>アドレス帳上の名前</th>" << endl;
+			*line_html << "<th width=\"150\" nowrap>名前</th>" << endl;
 			*line_html << "<th nowrap>送受信種別</th>" << endl;
-			*line_html << "<th nowrap>内容種別</th>" << endl;
+			//*line_html << "<th nowrap>内容種別</th>" << endl;
 			*line_html << "<th>内容</th>" << endl;
 		} else if (last_zChat != zChat) {
 			// zChatの値が前回と違う
@@ -161,10 +160,10 @@ void PrintResult(vector<LineHistory> array, ofstream *line_html) {
 			*line_html << "<table border=\"2\">" << endl;
 			// ヘッダー出力
 			*line_html << "<th width=\"150\" nowrap>日時(日本時間)</th>" << endl;
-			*line_html << "<th width=\"150\" nowrap>アドレス帳上の名前</th>" << endl;
-			*line_html << "<th width=\"150\" nowrap>LINE上の名前</th>" << endl;
+			//*line_html << "<th width=\"150\" nowrap>アドレス帳上の名前</th>" << endl;
+			*line_html << "<th width=\"150\" nowrap>名前</th>" << endl;
 			*line_html << "<th nowrap>送受信種別</th>" << endl;
-			*line_html << "<th nowrap>内容種別</th>" << endl;
+			//*line_html << "<th nowrap>内容種別</th>" << endl;
 			*line_html << "<th>内容</th>" << endl;
 		}
 
@@ -174,17 +173,17 @@ void PrintResult(vector<LineHistory> array, ofstream *line_html) {
 		// 出力
 		*line_html << "<tr>" << endl;
 		*line_html << "<td nowrap>" << zTimeStamp << "</td>" << endl;
-		*line_html << "<td nowrap>" << zAddress << "</td>" << endl;
+		//*line_html << "<td nowrap>" << zAddress << "</td>" << endl;
 		*line_html << "<td nowrap>" << zName << "</td>" << endl;
-		*line_html << "<td nowrap>" << mType << "</td>" << endl;
-		*line_html << "<td nowrap>" << cType << "</td>" << endl;
+		*line_html << "<td nowrap align=\"center\">" << mType << "</td>" << endl;
+		//*line_html << "<td nowrap>" << cType << "</td>" << endl;
 		if (EMPTY_STRING == fileName) {
 			// 画像無し
-			*line_html << "<td><div>" << zText << "</div></td>" << endl;
+			*line_html << "<td>" << zText << "</td>" << endl;
 		} else {
 			// 画像有り
-			*line_html << "<td><div>" << zText << "</div>" << endl;
-			*line_html << "<img border=\"0\" src=./thumbnail/" << fileName << " /></td>" << endl;
+			*line_html << "<td>" << zText << endl;
+			*line_html << "<br/><img border=\"0\" src=./thumbnail/" << fileName << " /></td>" << endl;
 		}
 		*line_html << "</tr>" << endl;
 
@@ -227,8 +226,9 @@ void PrintHtmlTagEnd(ofstream *line_html) {
 	*line_html << HTML_TAG_END << endl;
 	*line_html << BODY_TAG_END << endl;
 }
+
 /**
-*
+* main routine.
 *
 *
 */
@@ -236,7 +236,6 @@ int main(int argc, char * argv[])
 {
 	int result = -1;
 	sqlite3 *db = (sqlite3 *)0;
-	//	const char *sql = "SELECT ZMESSAGE.Z_OPT, ZMESSAGE.ZCONTENTTYPE, ZMESSAGE.ZTIMESTAMP, ZMESSAGE.ZCHAT, ZMESSAGE.ZID, ZMESSAGE.ZTEXT, ZMESSAGE.ZTHUMBNAIL, ZUSER.ZADDRESSBOOKNAME, ZUSER.ZNAME FROM ZMESSAGE LEFT JOIN ZUSER ON ZMESSAGE.ZSENDER = ZUSER.Z_PK ORDER BY ZMESSAGE.ZCHAT, ZMESSAGE.ZTIMESTAMP;";
 	const char *sql = "SELECT ZMESSAGE.Z_OPT, ZMESSAGE.ZCONTENTTYPE"
 		", DATETIME(ZMESSAGE.ZTIMESTAMP/1000, 'unixepoch', 'localtime')"
 		", ZMESSAGE.ZCHAT, ZMESSAGE.ZID, ZMESSAGE.ZTEXT"
@@ -247,6 +246,7 @@ int main(int argc, char * argv[])
 
 	sqlite3_stmt *stmt = (sqlite3_stmt *)0;
 	char *errMsg = (char *)0;
+
 	// サムネイルを格納
 	int size = 0;
 	void *buf = (char *)0;
@@ -257,6 +257,9 @@ int main(int argc, char * argv[])
 	// クエリ結果1レコード分を格納するオブジェクト
 	LineHistory lh;
 
+	// ファイル存在確認のための変数
+	struct stat statFile;
+
 	string tmp;
 	const unsigned char * zid = (unsigned char *)0;
 	const unsigned char * value = (unsigned char *)0;
@@ -265,14 +268,45 @@ int main(int argc, char * argv[])
 	// 出力ファイル
 	ofstream line_html;
 
+	// Initialize.
+	memset(&lh, 0, sizeof(lh));
+	memset(&statFile, 0, sizeof(statFile));
+
 	// 引数をチェック
 	if (1 == argc) {
-		fprintf(stderr, "Usage: %s <talk.sqlite>", argv[0]);
+		// 引数が指定されていない
+		fprintf(stderr, "Usage: %s <talk.sqlite>\n", argv[0]);
 		exit(-1);
-	} else if (FALSE == PathFileExists(argv[1])) {
-		// ファイルの存在をチェック
-		fprintf(stderr, "File not exists [%s]", argv[1]);
+	} else if (0 != stat(argv[1], &statFile)) {
+		// ファイルが無い
+		fprintf(stderr, "File \"%s\" does not exist.\n", argv[1]);
 		exit(-2);
+	} else {
+		// ファイルが有る
+		switch (statFile.st_mode & S_IFMT) {
+		case S_IFCHR:
+			fprintf(stderr,"File \"%s\" is character device.\n", argv[1]);
+			exit(-3);
+			break;
+		case S_IFDIR:
+			fprintf(stderr,"File \"%s\" is directory.\n", argv[1]);
+			exit(-4);
+			break;
+		case S_IFREG:
+			//fprintf(stdout,"File \"%s\" is regular file.\n", argv[1]);
+			break;
+		default:
+			fprintf(stderr,"File \"%s\" is unknown.\n", argv[1]);
+			exit(-5);
+			break;
+		}
+	}
+
+	// Check output directory.
+	if (0 == stat(RESULT_DIR, &statFile)) {
+		// "result" exists.
+		fprintf(stderr,"Directory \"%s\" exists.\n", RESULT_DIR);
+		exit(-6);
 	}
 
 	// DBファイルをオープン
@@ -399,11 +433,11 @@ int main(int argc, char * argv[])
 
 		if (SQLITE_DONE == result) {
 			// 出力フォルダ作成
-			if (!PathIsDirectory(RESULT_DIR)) {
+			if (0 != stat(RESULT_DIR, &statFile)) {
 				// resultフォルダが無い
 				_mkdir(RESULT_DIR);
 			}
-			if (!PathIsDirectory(THUMBNAIL_DIR)) {
+			if (0 != stat(THUMBNAIL_DIR, &statFile)) {
 				// result\thumbnailフォルダが無い
 				_mkdir(THUMBNAIL_DIR);
 			}
@@ -417,8 +451,6 @@ int main(int argc, char * argv[])
 		} else {
 			fprintf(stderr, "[ERROR] %s\n", errMsg );
 		}
-
-
 	}
 	// エラーメッセージ用バッファを解放
 	sqlite3_free(errMsg);
@@ -432,4 +464,3 @@ close:
 
 	return result;
 }
-
