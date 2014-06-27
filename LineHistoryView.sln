@@ -1,0 +1,29 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LineHistoryView", "LineHistoryView.vcxproj", "{F9D4C404-3697-405B-95C5-4B7E3AF4A34E}"
+	ProjectSection(ProjectDependencies) = postProject
+		{C04E9862-8A13-49EC-ABB8-734C1884F43B} = {C04E9862-8A13-49EC-ABB8-734C1884F43B}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sqlite3", "..\sqlite3\sqlite3.vcxproj", "{C04E9862-8A13-49EC-ABB8-734C1884F43B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{F9D4C404-3697-405B-95C5-4B7E3AF4A34E}.Debug|Win32.ActiveCfg = Debug|Win32
+		{F9D4C404-3697-405B-95C5-4B7E3AF4A34E}.Debug|Win32.Build.0 = Debug|Win32
+		{F9D4C404-3697-405B-95C5-4B7E3AF4A34E}.Release|Win32.ActiveCfg = Release|Win32
+		{F9D4C404-3697-405B-95C5-4B7E3AF4A34E}.Release|Win32.Build.0 = Release|Win32
+		{C04E9862-8A13-49EC-ABB8-734C1884F43B}.Debug|Win32.ActiveCfg = Debug|Win32
+		{C04E9862-8A13-49EC-ABB8-734C1884F43B}.Debug|Win32.Build.0 = Debug|Win32
+		{C04E9862-8A13-49EC-ABB8-734C1884F43B}.Release|Win32.ActiveCfg = Release|Win32
+		{C04E9862-8A13-49EC-ABB8-734C1884F43B}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
