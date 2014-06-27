@@ -46,13 +46,13 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>U:\Users\Kenya\Documents\source\LineHistoryView\lib\sqlite3</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>lib\sqlite3</AdditionalIncludeDirectories>
       <IntrinsicFunctions>true</IntrinsicFunctions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>sqlite3.lib</AdditionalDependencies>
-      <AdditionalLibraryDirectories>U:\Users\Kenya\Documents\source\sqlite3\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>lib\sqlite3\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -61,14 +61,14 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>U:\Users\Kenya\Documents\source\LineHistoryView\lib\sqlite3</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>lib\sqlite3</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>sqlite3.lib</AdditionalDependencies>
-      <AdditionalLibraryDirectories>U:\Users\Kenya\Documents\source\LineHistoryView\lib\sqlite3\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>lib\sqlite3\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
