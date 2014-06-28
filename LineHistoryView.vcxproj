@@ -74,9 +74,11 @@
   <ItemGroup>
     <ClCompile Include="LineHistory.cpp" />
     <ClCompile Include="LineHistoryView.cpp" />
+    <ClCompile Include="Record.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="LineHistory.h" />
+    <ClInclude Include="Record.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
