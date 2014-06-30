@@ -62,6 +62,7 @@ void PrintResult(vector<LineHistory> records, ofstream *line_html) {
 	string zTimeStamp;
 	string mType;
 	string zChat;
+	string zContentType;
 	string zName;
 	string zId;
 	string zText;
@@ -81,21 +82,35 @@ void PrintResult(vector<LineHistory> records, ofstream *line_html) {
 	while( it != records.end() ) {
 		lh = *it;
 
-		// 時刻
+		// ZCONTENTTYPE
+		zContentType = lh.GetValue("ZCONTENTTYPE");
+
+		// ZTIMESTAMP
 		zTimeStamp = lh.GetValue("ZTIMESTAMP");
-		// LINE上の名前
-		zName = lh.GetValue("ZNAME");
-		if ((0 == zName.length()) || zName.empty()) {
-			mType = "送信";
-		} else {
-			mType = "受信";
-		}
 
 		// ZCHAT
 		zChat = lh.GetValue("ZCHAT");
 
 		// ZTEXT
 		zText = lh.GetValue("ZTEXT");
+
+		// ZNAME
+		zName = lh.GetValue("ZNAME");
+
+		if ((0 == zName.length()) || zName.empty()) {
+			mType = "送信";
+		} else {
+			mType = "受信";
+			if ("6" == zContentType) {
+				// Phone call
+				zText = "＜音声通話＞";
+			}
+		}
+
+		if ("7" == zContentType) {
+				// Stamp
+				zText = "＜スタンプ＞";
+		}
 
 		// ZTHUMBNAIL
 		zThumbnail = lh.GetZthumbnail();
@@ -109,6 +124,7 @@ void PrintResult(vector<LineHistory> records, ofstream *line_html) {
 			// Free allocated memory.
 			free(zThumbnail);
 		}
+
 		if (it == records.begin()) {
 			// First record.
 			*line_html << "<table border=\"2\">" << endl;
