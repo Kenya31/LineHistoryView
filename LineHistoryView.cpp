@@ -1,21 +1,23 @@
-/**
+ï»¿/**
 * LineHistoryView.exe
 *
 * Create Date 2014/03/30
 *
 *
 * Update 2014/06/01
-*		ƒGƒ‰[ƒnƒ“ƒhƒŠƒ“ƒO‚ğ’Ç‰Á
-*		zTimeStamp‚É’l‚ª“ü‚Á‚Ä‚¢‚È‚©‚Á‚½ê‡‚ÉƒGƒ‰[‚Æ‚È‚é–â‘è‚ğC³
-*		ƒTƒ€ƒlƒCƒ‹‚ğƒTƒ€ƒlƒCƒ‹ƒtƒB[ƒ‹ƒh‚É•\¦‚·‚é‚æ‚¤‚É•ÏXB
+*		ã‚¨ãƒ©ãƒ¼ãƒãƒ³ãƒ‰ãƒªãƒ³ã‚°ã‚’è¿½åŠ 
+*		zTimeStampã«å€¤ãŒå…¥ã£ã¦ã„ãªã‹ã£ãŸå ´åˆã«ã‚¨ãƒ©ãƒ¼ã¨ãªã‚‹å•é¡Œã‚’ä¿®æ­£
+*		ã‚µãƒ ãƒã‚¤ãƒ«ã‚’ã‚µãƒ ãƒã‚¤ãƒ«ãƒ•ã‚£ãƒ¼ãƒ«ãƒ‰ã«è¡¨ç¤ºã™ã‚‹ã‚ˆã†ã«å¤‰æ›´
 *
 * Update 2014/06/08
-*		ƒTƒ€ƒlƒCƒ‹‚ğ“à—eƒtƒB[ƒ‹ƒh‚É•\¦‚·‚é‚æ‚¤‚É•ÏX
+*		ã‚µãƒ ãƒã‚¤ãƒ«ã‚’å†…å®¹ãƒ•ã‚£ãƒ¼ãƒ«ãƒ‰ã«è¡¨ç¤ºã™ã‚‹ã‚ˆã†ã«å¤‰æ›´
 *
 * Update 2014/06/10
-*		SELECT•¶‚ÉDATETIMEŠÖ”‚ğ’Ç‰ÁB
-*		‚»‚ê‚É”º‚¢‚¢‚ë‚¢‚ë•ÏX
+*		SELECTæ–‡ã«DATETIMEé–¢æ•°ã‚’è¿½åŠ 
+*		ãã‚Œã«ä¼´ã„ã„ã‚ã„ã‚å¤‰æ›´
 *
+* Update 2015/07/29
+*		resultãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒªã‚’result.20120729121314ã¨æ™‚åˆ»ã‚’è¿½åŠ 
 */
 #include <direct.h>
 #include <sqlite3.h>
@@ -23,6 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -30,9 +33,11 @@
 
 #include "LineHistory.h"
 
-using namespace std;
+#if defined(_MSC_VER)
+#pragma execution_character_set("utf-8")
+#endif
 
-#pragma execution_character_set("UTF-8")
+using namespace std;
 
 #define DOCTYPE_HTML "<!DOCTYPE html>"
 #define HTML_TAG_START "<html>"
@@ -50,15 +55,29 @@ using namespace std;
 #define BREAK_TAG "<br/>"
 #define EMPTY_STRING ""
 #define RESULT_DIR "result"
-#define THUMBNAIL_DIR "result/thumbnail"
-#define LINE_HTML "result/Line.html"
+#define THUMBNAIL_DIR "/thumbnail"
+#define LINE_HTML "/Line.html"
+
+#define SQL_FOR_IPHONE "SELECT ZMESSAGE.Z_OPT, ZMESSAGE.ZCONTENTTYPE"\
+	", DATETIME(ZMESSAGE.ZTIMESTAMP/1000, 'unixepoch', 'localtime') AS ZTIMESTAMP"\
+	", ZMESSAGE.ZCHAT, ZMESSAGE.ZID, ZMESSAGE.ZTEXT"\
+	", ZMESSAGE.ZTHUMBNAIL, ZUSER.ZADDRESSBOOKNAME"\
+	", ZUSER.ZNAME"\
+	" FROM ZMESSAGE LEFT JOIN ZUSER ON ZMESSAGE.ZSENDER = ZUSER.Z_PK"\
+	" ORDER BY ZMESSAGE.ZCHAT, ZMESSAGE.ZTIMESTAMP;"
+
+#define SQL_FOR_ANDROID "SELECT chat_history.attachment_type, "\
+	", DATETIME(chat_history.created_time/1000, 'unixepoch', 'localtime') AS created_time"\
+	", chat_history.chat_id, contacts.name, chat_history.content"\
+	"FROM chat_history LEFT JOIN contacts ON chat_history.from_mid = contacts.m_id"\
+	"ORDER BY chat_history.chat_id, chat_history.chat_id;"
 
 /**
-* ƒNƒGƒŠŒ‹‰Ê‚ğHTMLƒ^ƒO‚Å®Œ`‚µ‚Äo—Í
-* ˆê——Œ`®
+* ã‚¯ã‚¨ãƒªçµæœã‚’HTMLã‚¿ã‚°ã§æ•´å½¢ã—ã¦å‡ºåŠ›
+* ä¸€è¦§å½¢å¼
 *
 */
-void PrintResult(vector<LineHistory> records, ofstream *line_html) {
+void PrintResult(vector<LineHistory> records, ofstream *line_html, string thumbNailDir) {
 	string zTimeStamp;
 	string mType;
 	string zChat;
@@ -71,14 +90,14 @@ void PrintResult(vector<LineHistory> records, ofstream *line_html) {
 	string tmp;
 	string fileName;
 
-	// ‘O‰ñ‚ÌZCHAT‚Ì’l
+	// å‰å›ã®ZCHATã®å€¤
 	string last_zChat;
 
-	// 1ƒŒƒR[ƒh•ª‚Ìƒf[ƒ^‚ğŠi”[‚·‚éƒIƒuƒWƒFƒNƒg
+	// 1ãƒ¬ã‚³ãƒ¼ãƒ‰åˆ†ã®ãƒ‡ãƒ¼ã‚¿ã‚’æ ¼ç´ã™ã‚‹ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆ
 	LineHistory lh;
 	vector<LineHistory>::iterator it = records.begin();
 
-	// 1ƒŒƒR[ƒh‚¸‚Âˆ—
+	// 1ãƒ¬ã‚³ãƒ¼ãƒ‰ãšã¤å‡¦ç†
 	while( it != records.end() ) {
 		lh = *it;
 
@@ -98,18 +117,18 @@ void PrintResult(vector<LineHistory> records, ofstream *line_html) {
 		zName = lh.GetValue("ZNAME");
 
 		if ((0 == zName.length()) || zName.empty()) {
-			mType = "‘—M";
+			mType = "é€ä¿¡";
 		} else {
-			mType = "óM";
+			mType = "å—ä¿¡";
 			if ("6" == zContentType) {
 				// Phone call
-				zText = "ƒ‰¹º’Ê˜b„";
+				zText = "ï¼œéŸ³å£°é€šè©±ï¼";
 			}
 		}
 
 		if ("7" == zContentType) {
-				// Stamp
-				zText = "ƒƒXƒ^ƒ“ƒv„";
+			// Stamp
+			zText = "ï¼œã‚¹ã‚¿ãƒ³ãƒ—ï¼";
 		}
 
 		// ZTHUMBNAIL
@@ -118,7 +137,7 @@ void PrintResult(vector<LineHistory> records, ofstream *line_html) {
 		if (0 != size) {
 			fileName = lh.GetThumbFileName();
 			ofstream fout;
-			fout.open(THUMBNAIL_DIR + string("/") + fileName, ios::out|ios::binary|ios::trunc);
+			fout.open(thumbNailDir + string("/") + fileName, ios::out|ios::binary|ios::trunc);
 			fout.write((char *)zThumbnail, size);
 			fout.close();
 			// Free allocated memory.
@@ -128,44 +147,48 @@ void PrintResult(vector<LineHistory> records, ofstream *line_html) {
 		if (it == records.begin()) {
 			// First record.
 			*line_html << "<table border=\"2\">" << endl;
-			*line_html << "<th width=\"150\" nowrap>“ú(“ú–{ŠÔ)</th>" << endl;
-			*line_html << "<th width=\"150\" nowrap>–¼‘O</th>" << endl;
-			*line_html << "<th nowrap>‘—óMí•Ê</th>" << endl;
-			*line_html << "<th>“à—e</th>" << endl;
+			*line_html << "<th width=\"150\" nowrap>æ—¥æ™‚(æ—¥æœ¬æ™‚é–“)</th>" << endl;
+			*line_html << "<th width=\"150\" nowrap>åå‰</th>" << endl;
+			*line_html << "<th nowrap>é€å—ä¿¡ç¨®åˆ¥</th>" << endl;
+			*line_html << "<th>å†…å®¹</th>" << endl;
 		} else if (last_zChat != zChat) {
 			// Differ last calue of zChat.
 			*line_html << "</table>" << endl;
 			*line_html << "<hr size=\"5\"/>" << endl;
 			*line_html << "<table border=\"2\">" << endl;
 			// Output header
-			*line_html << "<th width=\"150\" nowrap>“ú(“ú–{ŠÔ)</th>" << endl;
-			*line_html << "<th width=\"150\" nowrap>–¼‘O</th>" << endl;
-			*line_html << "<th nowrap>‘—óMí•Ê</th>" << endl;
-			*line_html << "<th>“à—e</th>" << endl;
+			*line_html << "<th width=\"150\" nowrap>æ—¥æ™‚(æ—¥æœ¬æ™‚é–“)</th>" << endl;
+			*line_html << "<th width=\"150\" nowrap>åå‰</th>" << endl;
+			*line_html << "<th nowrap>é€å—ä¿¡ç¨®åˆ¥</th>" << endl;
+			*line_html << "<th>å†…å®¹</th>" << endl;
 		}
 
-		// zChat‚ğ‹L˜^
+		// zChatã‚’è¨˜éŒ²
 		last_zChat = zChat;
 
-		// o—Í
+		// å‡ºåŠ›
 		*line_html << "<tr>" << endl;
 		*line_html << "<td nowrap>" << zTimeStamp << "</td>" << endl;
 		*line_html << "<td nowrap>" << zName << "</td>" << endl;
 		*line_html << "<td nowrap align=\"center\">" << mType << "</td>" << endl;
 		if (EMPTY_STRING == fileName) {
-			// ‰æ‘œ–³‚µ
+			// ç”»åƒç„¡ã—
 			*line_html << "<td>" << zText << "</td>" << endl;
 		} else {
-			// ‰æ‘œ—L‚è
-			*line_html << "<td>" << zText << endl;
-			*line_html << "<br/><img border=\"0\" src=./thumbnail/" << fileName << " /></td>" << endl;
+			// ç”»åƒæœ‰ã‚Š
+			*line_html << "<td>" << endl;
+			*line_html << zText << endl;
+			*line_html << "<br/>" << endl;
+			*line_html << "<img border=\"0\" src=./thumbnail/" << fileName << " /><br/>" << endl;
+			*line_html << fileName << endl;
+			*line_html << "</td>" << endl;
 		}
 		*line_html << "</tr>" << endl;
 
-		// ƒCƒeƒŒ[ƒ^‚ği‚ß‚é
+		// ã‚¤ãƒ†ãƒ¬ãƒ¼ã‚¿ã‚’é€²ã‚ã‚‹
 		it++;
 
-		// •Ï”‚ğƒNƒŠƒA
+		// å¤‰æ•°ã‚’ã‚¯ãƒªã‚¢
 		zTimeStamp = EMPTY_STRING;
 		zName = EMPTY_STRING;
 		mType = EMPTY_STRING;
@@ -175,7 +198,7 @@ void PrintResult(vector<LineHistory> records, ofstream *line_html) {
 }
 
 /**
-* HTMLƒ^ƒO‚ÌŠJn‚ğo—Í
+* HTMLã‚¿ã‚°ã®é–‹å§‹ã‚’å‡ºåŠ›
 */
 void PrintHtmlTagStart(ofstream *line_html) {
 	*line_html << DOCTYPE_HTML << endl;
@@ -193,11 +216,11 @@ void PrintHtmlTagStart(ofstream *line_html) {
 }
 
 /**
-* HTMLƒ^ƒO‚ÌI’[‚ğo—Í
+* HTMLã‚¿ã‚°ã®çµ‚ç«¯ã‚’å‡ºåŠ›
 */
 void PrintHtmlTagEnd(ofstream *line_html) {
-	*line_html << HTML_TAG_END << endl;
 	*line_html << BODY_TAG_END << endl;
+	*line_html << HTML_TAG_END << endl;
 }
 
 /**
@@ -206,13 +229,7 @@ void PrintHtmlTagEnd(ofstream *line_html) {
 int getLineHistoryRecords(sqlite3 *db, vector<LineHistory> *results) {
 	int sqlite3_result = 0;
 	int columnCount = 0;
-	const char *sql = "SELECT ZMESSAGE.Z_OPT, ZMESSAGE.ZCONTENTTYPE"
-		", DATETIME(ZMESSAGE.ZTIMESTAMP/1000, 'unixepoch', 'localtime') AS ZTIMESTAMP"
-		", ZMESSAGE.ZCHAT, ZMESSAGE.ZID, ZMESSAGE.ZTEXT"
-		", ZMESSAGE.ZTHUMBNAIL, ZUSER.ZADDRESSBOOKNAME"
-		", ZUSER.ZNAME"
-		" FROM ZMESSAGE LEFT JOIN ZUSER ON ZMESSAGE.ZSENDER = ZUSER.Z_PK"
-		" ORDER BY ZMESSAGE.ZCHAT, ZMESSAGE.ZTIMESTAMP;";
+	const char *sql = SQL_FOR_IPHONE;
 	const char *param = (char *)0;
 	const unsigned char *value = (unsigned char *)0;
 
@@ -244,7 +261,7 @@ int getLineHistoryRecords(sqlite3 *db, vector<LineHistory> *results) {
 				} else {
 					if (0 == strcmp(param, "ZTHUMBNAIL")) {
 						// ZTHUMBNAIL
-						// ƒTƒ€ƒlƒCƒ‹‚ğŠi”[
+						// ã‚µãƒ ãƒã‚¤ãƒ«ã‚’æ ¼ç´
 						char *zThumbnail = (char *)0;
 						int size = sqlite3_column_bytes(stmt, i);
 						void *buf = (char *)0;
@@ -271,7 +288,7 @@ int getLineHistoryRecords(sqlite3 *db, vector<LineHistory> *results) {
 			// Add to object array.
 			results->push_back(lh);
 		}
-		// stmt‚ğ‰ğ•ú
+		// stmtã‚’è§£æ”¾
 		sqlite3_finalize(stmt);
 	}
 	return sqlite3_result;
@@ -319,7 +336,7 @@ int getRecords(sqlite3 *db, const char *sql, vector<Record> *results) {
 			// Add to object array.
 			results->push_back(rec);
 		}
-		// stmt‚ğ‰ğ•ú
+		// stmtã‚’è§£æ”¾
 		sqlite3_finalize(stmt);
 	}
 
@@ -336,29 +353,29 @@ int main(int argc, char * argv[])
 	int result = -1;
 	sqlite3 *db = (sqlite3 *)0;
 
-	// ƒNƒGƒŠŒ‹‰Ê‚ğŠi”[‚·‚é”z—ñ
+	// ã‚¯ã‚¨ãƒªçµæœã‚’æ ¼ç´ã™ã‚‹é…åˆ—
 	vector<LineHistory> results;
 
-	// ƒtƒ@ƒCƒ‹‘¶İŠm”F‚Ì‚½‚ß‚Ì•Ï”
+	// ãƒ•ã‚¡ã‚¤ãƒ«å­˜åœ¨ç¢ºèªã®ãŸã‚ã®å¤‰æ•°
 	struct stat statFile;
 
-	// o—Íƒtƒ@ƒCƒ‹
+	// å‡ºåŠ›ãƒ•ã‚¡ã‚¤ãƒ«
 	ofstream line_html;
 
 	// Initialize.
 	memset(&statFile, 0, sizeof(statFile));
 
-	// ˆø”‚ğƒ`ƒFƒbƒN
+	// å¼•æ•°ã‚’ãƒã‚§ãƒƒã‚¯
 	if (1 == argc) {
-		// ˆø”‚ªw’è‚³‚ê‚Ä‚¢‚È‚¢
+		// å¼•æ•°ãŒæŒ‡å®šã•ã‚Œã¦ã„ãªã„
 		fprintf(stderr, "Usage: %s <talk.sqlite>\n", argv[0]);
 		exit(-1);
 	} else if (0 != stat(argv[1], &statFile)) {
-		// ƒtƒ@ƒCƒ‹‚ª–³‚¢
+		// ãƒ•ã‚¡ã‚¤ãƒ«ãŒç„¡ã„
 		fprintf(stderr, "File \"%s\" does not exist.\n", argv[1]);
 		exit(-2);
 	} else {
-		// ƒtƒ@ƒCƒ‹‚ª—L‚é
+		// ãƒ•ã‚¡ã‚¤ãƒ«ãŒæœ‰ã‚‹
 		switch (statFile.st_mode & S_IFMT) {
 		case S_IFCHR:
 			fprintf(stderr,"File \"%s\" is character device.\n", argv[1]);
@@ -378,10 +395,35 @@ int main(int argc, char * argv[])
 		}
 	}
 
+	// Make directory name.
+	string dirName;
+	string thumbNailDir;
+	string lineHtml;
+	string dateTime;
+	struct tm date;
+	char tmp[32];
+	time_t timer;
+
+	memset(&date, '\0', sizeof(date));
+	timer = time(NULL);
+	localtime_s(&date, &timer);
+	strftime(tmp, sizeof(tmp), "%Y%m%d%H%M%S", &date);
+	dateTime = tmp;
+	// result.YYYYmmDDHHMMSS
+	dirName = RESULT_DIR;
+	dirName.append(".");
+	dirName.append(dateTime);
+	// result.YYYYmmDDHHMMSS\thumbnail
+	thumbNailDir = dirName;
+	thumbNailDir.append(THUMBNAIL_DIR);
+	// result.YYYYmmDDHHMMSS\Line.html
+	lineHtml = dirName;
+	lineHtml.append(LINE_HTML);
+
 	// Check output directory.
-	if (0 == stat(RESULT_DIR, &statFile)) {
+	if (0 == stat(dirName.c_str(), &statFile)) {
 		// "result" exists.
-		fprintf(stderr,"Directory \"%s\" exists.\n", RESULT_DIR);
+		fprintf(stderr,"Directory \"%s\" exists.\n", dirName.c_str());
 		exit(-6);
 	}
 
@@ -395,18 +437,18 @@ int main(int argc, char * argv[])
 		result = getLineHistoryRecords(db, &results);
 		if (SQLITE_DONE == result) {
 			// Create output directory.
-			if (0 != stat(RESULT_DIR, &statFile)) {
-				// resultƒtƒHƒ‹ƒ_‚ª–³‚¢
-				_mkdir(RESULT_DIR);
+			if (0 != stat(dirName.c_str(), &statFile)) {
+				// resultãƒ•ã‚©ãƒ«ãƒ€ãŒç„¡ã„
+				_mkdir(dirName.c_str());
 			}
-			if (0 != stat(THUMBNAIL_DIR, &statFile)) {
-				// result\thumbnailƒtƒHƒ‹ƒ_‚ª–³‚¢
-				_mkdir(THUMBNAIL_DIR);
+			if (0 != stat(thumbNailDir.c_str(), &statFile)) {
+				// result.YYYYmmDDHHMMSS\thumbnailãƒ•ã‚©ãƒ«ãƒ€ãŒç„¡ã„
+				_mkdir(thumbNailDir.c_str());
 			}
-			line_html.open(LINE_HTML, ios::out|ios::binary|ios::trunc);
+			line_html.open(lineHtml.c_str(), ios::out|ios::binary|ios::trunc);
 
 			PrintHtmlTagStart(&line_html);
-			PrintResult(results, &line_html);
+			PrintResult(results, &line_html, thumbNailDir);
 			PrintHtmlTagEnd(&line_html);
 			line_html.flush();
 			line_html.close();
@@ -416,7 +458,7 @@ int main(int argc, char * argv[])
 	}
 
 close:
-	// DB‚ğ•Â‚¶‚é
+	// DBã‚’é–‰ã˜ã‚‹
 	sqlite3_close(db);
 
 	return result;
